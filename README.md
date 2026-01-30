@@ -11,6 +11,20 @@
 - 匯入 / 匯出設定檔（JSON）
 - 以 iPhone 14 Pro 行動裝置視窗模擬截圖（393×852 @3x）
 
+## 應用程式截圖
+
+![App Screenshot](docs/screenshot01.png)
+![App Screenshot](docs/screenshot02.png)
+
+## 使用說明
+
+1. 啟動應用程式
+2. 在輸入框中貼上目標網站網址
+3. 設定 CSS Selector (例如 `.ad-banner`) 以定位廣告區塊
+4. 點擊「加入清單」將設定加入排程列表
+5. 點擊「立即執行」或等待排程自動觸發截圖
+6. 截圖完成後將儲存於 `screenshots/` 目錄
+
 ## 環境需求
 
 - Node.js
