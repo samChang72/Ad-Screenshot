@@ -1,0 +1,70 @@
+{
+  "name": "ad-screenshot-app",
+  "version": "1.0.0",
+  "description": "跨平台廣告版位截圖應用程式",
+  "main": "dist/main/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev:renderer": "wait-on dist/main/index.js && electron .",
+    "build": "npm run build:main && npm run build:renderer && npm run copy-assets",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "copy-assets": "mkdir -p dist/renderer/renderer/styles && cp src/renderer/index.html dist/renderer/renderer/ && cp src/renderer/styles/main.css dist/renderer/renderer/styles/",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
+  },
+  "keywords": [
+    "electron",
+    "screenshot",
+    "advertising"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-schedule": "^2.1.1",
+    "puppeteer": "^23.0.0",
+    "puppeteer-screen-recorder": "^3.0.6",
+    "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "@types/node": "^22.0.0",
+    "@types/node-schedule": "^2.1.8",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^9.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.adscreenshot.app",
+    "productName": "Ad Screenshot",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

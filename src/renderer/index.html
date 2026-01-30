@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <title>Ad Screenshot</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- 標題列 -->
+    <header class="title-bar">
+      <div class="title-bar-drag">
+        <span class="app-icon">📸</span>
+        <h1>Ad Screenshot</h1>
+      </div>
+      <div class="title-bar-actions">
+        <div id="progress-display" class="progress-display hidden">
+          <span id="progress-url" class="progress-url"></span>
+          <span id="progress-selector" class="progress-selector"></span>
+        </div>
+        <span id="status-indicator" class="status-indicator status-idle">⏸ 待命中</span>
+      </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="main-content">
+      <!-- 工具列 -->
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-add-site" class="btn btn-primary">
+            <span class="icon">➕</span> 新增網站
+          </button>
+          <button id="btn-import" class="btn btn-secondary">
+            <span class="icon">📥</span> 匯入
+          </button>
+          <button id="btn-export" class="btn btn-secondary">
+            <span class="icon">📤</span> 匯出
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <button id="btn-run-all" class="btn btn-success">
+            <span class="icon">▶️</span> 立即執行全部
+          </button>
+        </div>
+      </div>
+
+      <!-- 設定面板 -->
+      <div class="panels">
+        <!-- 左側：網站列表 -->
+        <section class="panel sites-panel">
+          <div class="panel-header">
+            <h2>📋 網站列表</h2>
+          </div>
+          <div class="panel-content">
+            <ul id="sites-list" class="sites-list">
+              <!-- 動態產生 -->
+            </ul>
+            <div id="empty-state" class="empty-state">
+              <p>尚未新增任何網站</p>
+              <p class="hint">點擊「新增網站」開始設定</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右側：設定詳情 -->
+        <section class="panel settings-panel">
+          <section class="config-section collapsible">
+            <div class="section-header collapsible-trigger" id="settings-trigger">
+              <div class="header-left">
+                <h2>⚙️ 輸出設定</h2>
+                <span class="collapse-icon">▼</span>
+              </div>
+            </div>
+            <div class="section-content" id="settings-content">
+              <div class="form-group">
+                <label for="output-directory">輸出目錄</label>
+                <div class="input-with-button">
+                  <input type="text" id="output-directory" placeholder="選擇截圖儲存路徑...">
+                  <button id="btn-select-dir" class="btn btn-secondary">選擇</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="filename-pattern">檔案名稱格式</label>
+                <input type="text" id="filename-pattern" placeholder="{siteName}_{selectorName}_{timestamp}">
+                <small class="hint">可用變數: {siteName}, {selectorName}, {timestamp}</small>
+              </div>
+            </div>
+          </section>
+
+          <!-- 任務執行狀態面板 -->
+          <section class="status-section">
+            <div class="section-header">
+              <h2>📊 任務執行狀態</h2>
+            </div>
+            <div id="tasks-container" class="tasks-container">
+              <div class="empty-tasks-hint">目前沒有進行中的任務</div>
+            </div>
+          </section>
+
+          <!-- 排程設定 -->
+          <div class="settings-section">
+            <h3>⏰ 排程設定</h3>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="schedule-enabled">
+                <span>啟用自動排程</span>
+              </label>
+            </div>
+            <div class="form-group" id="schedule-options">
+              <label>執行間隔（分鐘）</label>
+              <input type="number" id="schedule-interval" min="1" max="1440" value="60">
+            </div>
+            <div class="schedule-status">
+              <span id="next-run">下次執行: --</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 網站編輯 Modal -->
+    <div id="site-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">新增網站</h3>
+          <button id="btn-close-modal" class="btn-icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>網站名稱</label>
+            <input type="text" id="site-name" placeholder="例如: 新聞網站">
+          </div>
+          <div class="form-group">
+            <label>網址 (URL)</label>
+            <input type="url" id="site-url" placeholder="https://example.com">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="site-fullpage">
+              <span>📜 截取完整長網頁</span>
+            </label>
+            <small class="hint">勾選後會捲動整個頁面並截取完整長截圖</small>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="site-recording">
+              <span>📹 錄製操作過程</span>
+            </label>
+            <small class="hint">錄製捲動與載入過程並存成 MP4 影片</small>
+          </div>
+
+          <div class="selectors-section">
+            <div class="section-header">
+              <h4>CSS Selectors</h4>
+              <button id="btn-add-selector" class="btn btn-small">➕ 新增</button>
+            </div>
+            <ul id="selectors-list" class="selectors-list">
+              <!-- 動態產生 -->
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel" class="btn btn-secondary">取消</button>
+          <button id="btn-save-site" class="btn btn-primary">儲存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
