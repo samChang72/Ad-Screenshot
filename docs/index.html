@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ad Screenshot - 跨平台廣告版位截圖工具</title>
+    <meta name="description" content="自動化截取網站廣告版位，支援排程、完整網頁截圖與操作錄影。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📸</text></svg>">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="#" class="logo">Ad Screenshot<span class="dot">.</span></a>
+            <div class="nav-links">
+                <a href="#features">功能</a>
+                <a href="#how-it-works">使用方式</a>
+                <a href="https://github.com/sam/ad-screenshot-app" target="_blank" class="github-link">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container hero-content">
+            <div class="hero-text">
+                <span class="badge">v1.0.0 正式發佈</span>
+                <h1>自動化您的<br><span class="gradient-text">廣告截圖</span>任務</h1>
+                <p class="hero-desc">設定 CSS Selector，自動巡檢並截取指定廣告版位。支援 iPhone 14 Pro 模擬、長網頁截圖與操作錄影，讓報表製作更輕鬆。</p>
+                
+                <div class="cta-group">
+                    <a href="https://github.com/samChang72/Ad-Screenshot/releases/latest/download/AdScreenshot-mac.dmg" class="btn btn-primary" id="mac-download">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.21-1.96 1.07-3.11-1.05.05-2.31.74-3.03 1.63-.65.79-1.22 2.02-1.06 3.09 1.17.09 2.33-.73 3.02-1.61"/></svg>
+                        下載 macOS 版
+                        <span class="sub-text">.dmg (Intel/Apple Silicon)</span>
+                    </a>
+                    <a href="https://github.com/samChang72/Ad-Screenshot/releases/latest/download/AdScreenshot-win.exe" class="btn btn-secondary" id="win-download">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.75L9 5.43V11.91L3 12ZM20 2.324C20.0066 2.324 20.0133 2.324 20.02 2.324V11.58L10.02 11.74V4.68L20 2.324ZM9 12.92V19.46L3 18.14V12.92H9ZM10.02 12.83V19.89L20.02 22.34V12.7L10.02 12.83Z"/></svg>
+                        下載 Windows 版
+                        <span class="sub-text">.exe (Installer)</span>
+                    </a>
+                </div>
+                <p class="compatibility-note">適用於 macOS 10.15+ 與 Windows 10/11</p>
+            </div>
+            <div class="hero-image">
+                <div class="browser-window">
+                    <div class="browser-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <img src="screenshot01.png" alt="Ad Screenshot App Interface" class="app-screenshot">
+                </div>
+                <div class="blob blob-1"></div>
+                <div class="blob blob-2"></div>
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">強大功能，<br>專為廣告營運設計</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>精準定位截圖</h3>
+                    <p>貼上網址並設定 CSS Selector，即可精準截取特定廣告版位，排除不相關內容干擾。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>行動裝置模擬</h3>
+                    <p>內建 iPhone 14 Pro 視窗模擬 (393×852)，真實呈現廣告在手機上的樣貌。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡️</div>
+                    <h3>自動化排程</h3>
+                    <p>設定定時任務（預設 60 分鐘），全天候自動巡檢並保存截圖證據。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎥</div>
+                    <h3>完整記錄</h3>
+                    <p>支援長網頁捲動截圖 (Full Page) 與操作過程錄影 (MP4)，不錯過任何動態細節。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <div class="steps-wrapper">
+                <div class="step-image">
+                    <img src="screenshot02.png" alt="設定畫面" class="step-img">
+                </div>
+                <div class="steps-content">
+                    <h2 class="section-title">簡單三步驟<br>開始自動化</h2>
+                    <ul class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">01</div>
+                            <div class="step-text">
+                                <h3>新增目標網站</h3>
+                                <p>輸入網站名稱與網址，選擇是否需要錄影或長截圖。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">02</div>
+                            <div class="step-text">
+                                <h3>設定 CSS Selector</h3>
+                                <p>指定廣告版位的 CSS 選擇器（例如 <code>.ad-banner</code>），可設定多組。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">03</div>
+                            <div class="step-text">
+                                <h3>啟動排程</h3>
+                                <p>點擊立即執行測試效果，或開啟排程讓它自動在背景工作。</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">Ad Screenshot</div>
+                <p class="copyright">&copy; 2024 Ad Screenshot App. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <script>
+        // 簡單的 OS 偵測，突顯對應的下載按鈕
+        document.addEventListener('DOMContentLoaded', () => {
+            const platform = navigator.platform.toLowerCase();
+            const macBtn = document.getElementById('mac-download');
+            const winBtn = document.getElementById('win-download');
+            
+            if (platform.includes('mac')) {
+                macBtn.classList.add('highlight');
+            } else if (platform.includes('win')) {
+                winBtn.classList.add('highlight');
+            }
+        });
+    </script>
+</body>
+</html>
