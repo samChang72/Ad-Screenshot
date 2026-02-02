@@ -42,12 +42,12 @@ if (dmgFile) {
 }
 
 // 處理 Windows
-const exeFile = findFile(releaseDir, '.exe');
-if (exeFile) {
-    const targetName = `Ad.Screenshot-${version}.exe`;
-    copyAndRename(exeFile, targetName);
+const zipFile = findFile(releaseDir, '.zip');
+if (zipFile) {
+    const targetName = `Ad-Screenshot-${version}-win-x64.zip`;
+    copyAndRename(zipFile, targetName);
 } else {
-    console.warn('⚠️  警告: 在 release/ 目錄中找不到 .exe 檔案。');
+    console.warn('⚠️  警告: 在 release/ 目錄中找不到 .zip 檔案。');
 }
 
 console.log('\n✅ 準備完成！');
