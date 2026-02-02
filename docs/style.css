@@ -196,6 +196,51 @@ h1 {
     font-size: 0.875rem;
     color: #6b7280;
     margin-top: 16px;
+    margin-bottom: 24px;
+}
+
+/* Install Guide */
+.install-guide {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 0.9rem;
+    max-width: 480px;
+}
+
+.install-hint {
+    color: #fca5a5;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.install-note {
+    color: #e5e7eb;
+    margin-bottom: 8px;
+}
+
+.install-guide ol {
+    padding-left: 20px;
+    color: #d1d5db;
+}
+
+.install-guide li {
+    margin-bottom: 4px;
+}
+
+.install-guide code {
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fca5a5;
+    font-size: 0.85em;
+    display: inline-block;
+    margin-top: 4px;
+    user-select: all;
 }
 
 .hero-image {
@@ -417,5 +462,10 @@ code {
     
     .step-image {
         order: 2;
+    }
+
+    .install-guide {
+        margin: 0 auto;
+        text-align: left;
     }
 }
