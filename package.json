@@ -1,6 +1,6 @@
 {
   "name": "ad-screenshot-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "跨平台廣告版位截圖應用程式",
   "main": "dist/main/main/index.js",
   "scripts": {
@@ -25,17 +25,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "ffmpeg-static": "^5.3.0",
     "node-schedule": "^2.1.1",
     "puppeteer": "^23.0.0",
     "puppeteer-screen-recorder": "^3.0.6",
     "uuid": "^11.0.0"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
     "@types/node": "^22.0.0",
     "@types/node-schedule": "^2.1.8",
     "@types/uuid": "^10.0.0",
     "concurrently": "^9.0.0",
+    "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "typescript": "^5.0.0",
     "wait-on": "^8.0.0"
@@ -49,6 +50,9 @@
     "files": [
       "dist/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/ffmpeg"
     ],
     "mac": {
       "category": "public.app-category.utilities",
