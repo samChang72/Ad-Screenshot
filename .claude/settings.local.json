@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(node:*)",
+      "Bash(npx @puppeteer/browsers install:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\ntest: 新增 Playwright E2E 測試框架\n\n- 使用 Playwright Electron 支援建立 22 個 E2E 測試案例\n- 涵蓋應用啟動、網站 CRUD、Selector CRUD、截圖觸發、排程設定、設定匯出匯入\n- 在 main process 加入測試模式（NODE_ENV=test + AD_SCREENSHOT_TEST_MODE）mock 截圖引擎\n- 每個測試使用獨立 userData 目錄確保隔離\n- 更新 README 加入測試說明，更新 .gitignore 排除 .env 和測試產出\nEOF\n\\)\")",
+      "Bash(gh release:*)"
+    ]
+  }
+}
