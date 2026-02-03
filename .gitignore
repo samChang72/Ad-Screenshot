@@ -10,3 +10,4 @@ release-fast/
 .env.*
 test-results/
 playwright-report/
+puppeteer_cache/

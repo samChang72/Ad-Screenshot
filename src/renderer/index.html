@@ -172,11 +172,33 @@
       </div>
     </div>
 
+    <!-- 瀏覽器下載 Modal -->
+    <div id="browser-download-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content browser-download-content">
+        <div class="modal-header">
+          <h3>🌐 瀏覽器準備中</h3>
+        </div>
+        <div class="modal-body browser-download-body">
+          <p id="browser-status-text" class="browser-status-text">正在檢查瀏覽器組件...</p>
+          <div id="download-progress-container" class="download-progress-container hidden">
+            <div class="download-progress-track">
+              <div id="download-progress-bar" class="download-progress-bar"></div>
+            </div>
+            <div class="download-progress-info">
+              <span id="download-progress-percent">0%</span>
+              <span id="download-progress-details">0MB / 0MB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 通知 -->
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script defer src="app.js"></script>
 </body>
 
 </html>

@@ -1,44 +1,54 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PuppeteerScreenRecorder } from 'puppeteer-screen-recorder';
 import { ScreenshotJob, ScreenshotResult, SelectorConfig } from '../shared/types';
+import { BrowserManager } from './browser-manager';
 
 export class ScreenshotEngine {
     private browser: Browser | null = null;
 
     private async getBrowser(): Promise<Browser> {
-        if (!this.browser) {
-            // 智慧偵測 Chromium 執行路徑
-            let executablePath: string | undefined = undefined;
-            
-            // 如果是打包後的環境 (production)，嘗試尋找打包進去的 Chromium
-            if (process.env.NODE_ENV !== 'development') {
-                // 這裡的路徑取決於 electron-builder 如何打包 puppeteer
-                // 通常 puppeteer 會下載 chromium 到 cache，我們需要確保它被正確打包
-                // 或者嘗試使用系統安裝的 Chrome (作為備案)
-                try {
-                    // 嘗試自動偵測，如果不行的話，錯誤會被 catch 住
-                    const puppeteerConfig = require('puppeteer/package.json');
-                    // 這裡先保留預設，讓 puppeteer 自己找，但在 launch args 增加設定
-                } catch (e) {
-                    console.warn('Could not resolve puppeteer config', e);
-                }
-            }
-
+        // 檢查現有連線是否仍然有效
+        if (this.browser) {
             try {
-                this.browser = await puppeteer.launch({
-                    headless: true,
-                    // 重要：打包後必須指定 executablePath，否則會去 node_modules 找
-                    // 如果 puppeteer 的 browser 沒有被正確 unpack，這裡會失敗
-                    // 我們先用預設的嘗試，如果失敗，錯誤訊息現在會顯示出來
-                    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                });
-            } catch (launchError: any) {
-                // 如果啟動失敗，拋出詳細錯誤
-                throw new Error(`Puppeteer Launch Failed: ${launchError.message}\nStack: ${launchError.stack}`);
+                // 透過簡單操作測試連線是否存活
+                await this.browser.version();
+                return this.browser;
+            } catch {
+                console.warn('Browser connection lost, resetting...');
+                this.browser = null;
             }
         }
+
+        let executablePath: string | undefined;
+
+        try {
+            // 使用 BrowserManager 取得路徑
+            executablePath = await BrowserManager.getInstance().getExecutablePath();
+
+            // 如果找不到，嘗試確保安裝 (但不帶 UI 回饋)
+            if (!executablePath) {
+                console.log('Browser not found via getExecutablePath, trying ensureBrowser...');
+                executablePath = await BrowserManager.getInstance().ensureBrowser();
+            }
+
+            if (!executablePath) {
+                throw new Error('無法找到或下載 Chromium 瀏覽器');
+            }
+
+            console.log(`Launching browser from: ${executablePath}`);
+
+            this.browser = await puppeteer.launch({
+                headless: true,
+                executablePath,
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            });
+        } catch (launchError: any) {
+            const shortMsg = launchError.message?.split('\n')[0] || 'Unknown error';
+            throw new Error(`瀏覽器啟動失敗: ${shortMsg}`);
+        }
+
         return this.browser;
     }
 
@@ -141,13 +151,13 @@ export class ScreenshotEngine {
 
         } catch (error) {
             const err = error as Error;
-            const errorMessage = `${err.message}\nStack: ${err.stack || ''}`;
-            console.error(`Failed to take screenshots for ${job.url}:`, errorMessage);
+            const errorMessage = err.message?.split('\n')[0] || 'Unknown error';
+            console.error(`Failed to take screenshots for ${job.url}:`, err);
 
             // 如果是在啟動瀏覽器時就失敗，直接回傳一個系統錯誤
             if (results.length === 0 && job.selectors.length === 0) {
-                 // 這裡應該不會發生，因為 job.selectors 通常有東西，但為了防禦性程式設計
-                 results.push({
+                // 這裡應該不會發生，因為 job.selectors 通常有東西，但為了防禦性程式設計
+                results.push({
                     success: false,
                     siteName: job.siteName,
                     selectorName: '系統錯誤',
@@ -159,7 +169,7 @@ export class ScreenshotEngine {
             // 為所有 selectors 回報錯誤 (如果尚未執行)
             // 注意：這裡邏輯有點簡化，理想上應該只回報尚未執行的
             if (results.length < (job.selectors.length + (job.fullPageScreenshot ? 1 : 0))) {
-                 for (const selector of job.selectors) {
+                for (const selector of job.selectors) {
                     // 避免重複加入已完成的
                     if (!results.find(r => r.selectorName === selector.name)) {
                         results.push({
@@ -239,7 +249,7 @@ export class ScreenshotEngine {
         // 在開發模式下，ffmpeg-static 位於 node_modules 中
         // 在打包後，如果我們有設定 asarUnpack，它會在 app.asar.unpacked 資料夾中
         const ffmpegPath = require('ffmpeg-static');
-        
+
         if (process.env.NODE_ENV === 'development') {
             return ffmpegPath;
         }
@@ -264,7 +274,8 @@ export class ScreenshotEngine {
         try {
             // 如果啟用錄影，啟動錄影
             if (job.recordVideo) {
-                recorder = new PuppeteerScreenRecorder(page, {
+                // @ts-ignore: puppeteer-screen-recorder expects puppeteer.Page but we have puppeteer-core.Page
+                recorder = new PuppeteerScreenRecorder(page as any, {
                     followNewTab: true,
                     fps: 25,
                     ffmpeg_Path: this.getFfmpegPath(), // 顯式指定 ffmpeg 路徑

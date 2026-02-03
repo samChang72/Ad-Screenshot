@@ -89,7 +89,14 @@ export const IPC_CHANNELS = {
 
     // 檔案相關
     SELECT_DIRECTORY: 'dialog:select-directory',
+
+    // 瀏覽器相關
+    BROWSER_DOWNLOAD_PROGRESS: 'browser:download-progress',
+    BROWSER_STATUS: 'browser:status',
 } as const;
+
+export type BrowserStatus = 'checking' | 'downloading' | 'ready' | 'error';
+
 
 // 預設設定
 export const DEFAULT_CONFIG: AppConfig = {
