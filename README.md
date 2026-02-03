@@ -112,19 +112,59 @@ src/
 - `nodeIntegration: false` — 禁止渲染程式直接存取 Node.js
 - Context Bridge — 僅暴露白名單 IPC 頻道
 
-## 測試
+## E2E 測試
 
-使用 [Playwright](https://playwright.dev/) 進行 E2E 測試，涵蓋應用程式啟動、網站/Selector CRUD、截圖觸發、排程設定、設定匯出匯入等核心流程。
+使用 [Playwright](https://playwright.dev/) 進行端對端測試，透過 `@playwright/test` 的 Electron 支援直接操控真實應用程式視窗。
+
+### 執行測試
 
 ```bash
-# 執行 E2E 測試（自動 build 後執行）
+# 執行全部 E2E 測試（自動 build 後執行）
 npm run test:e2e
 
-# 帶 UI 視窗執行（方便觀察）
+# 帶 UI 視窗執行（方便觀察操作過程）
 npm run test:e2e:headed
 
-# 偵錯模式
+# 偵錯模式（開啟 Playwright Inspector）
 npm run test:e2e:debug
 ```
 
-測試透過環境變數 `AD_SCREENSHOT_TEST_MODE` 在 main process 層面 mock 截圖引擎，無需啟動真實瀏覽器，每次測試使用獨立的 `userData` 目錄確保隔離。
+### 測試涵蓋範圍
+
+| 測試檔案 | 涵蓋功能 |
+|---------|---------|
+| `app-launch.spec.ts` | 應用程式啟動、視窗載入、初始狀態驗證 |
+| `site-crud.spec.ts` | 網站新增/編輯/刪除/啟用切換 |
+| `selector-crud.spec.ts` | CSS Selector 新增/編輯/刪除 |
+| `screenshot.spec.ts` | 截圖觸發與結果驗證 |
+| `schedule.spec.ts` | 排程啟用/停用/間隔設定 |
+| `config-io.spec.ts` | 設定檔匯入/匯出 |
+
+### 測試架構
+
+```
+e2e/
+├── playwright.config.ts    # Playwright 設定（30s timeout, 單執行緒）
+├── fixtures/
+│   ├── electron-app.ts     # Electron 應用程式 fixture（啟動/關閉/隔離）
+│   └── test-helpers.ts     # 共用操作函式（addSite, waitForToast 等）
+└── tests/
+    └── *.spec.ts           # 測試案例
+```
+
+### 測試隔離機制
+
+- **環境變數** `AD_SCREENSHOT_TEST_MODE=1`：在 main process 層面 mock 截圖引擎，無需啟動真實 Chromium
+- **獨立 userData 目錄**：每次測試使用 `os.tmpdir()` 下的臨時目錄，測試結束後自動清理
+- **單執行緒執行**：`workers: 1` 避免多視窗競爭
+
+### 測試報告
+
+測試執行後會產生 HTML 報告：
+
+```bash
+# 開啟最近一次的測試報告
+npx playwright show-report
+```
+
+報告位於 `playwright-report/` 目錄，包含每個測試的執行狀態、截圖與錯誤訊息。
