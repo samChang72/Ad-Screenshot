@@ -1,4 +1,13 @@
-const { ipcRenderer } = require('electron');
+// ===================================
+// Electron API Bridge (透過 preload.ts 暴露)
+// ===================================
+const api = (window as {
+    electronAPI?: {
+        invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+        on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
+        removeAllListeners: (channel: string) => void;
+    }
+}).electronAPI!;
 
 // ===================================
 // Types
@@ -58,6 +67,8 @@ const IPC_CHANNELS = {
     SCHEDULE_STOP: 'schedule:stop',
     SCHEDULE_STATUS: 'schedule:status',
     SELECT_DIRECTORY: 'dialog:select-directory',
+    BROWSER_STATUS: 'browser:status',
+    BROWSER_DOWNLOAD_PROGRESS: 'browser:download-progress',
 };
 
 // ===================================
@@ -78,6 +89,9 @@ let config: AppConfig = {
 
 let editingSite: SiteConfig | null = null;
 let editingSelectors: SelectorConfig[] = [];
+
+// 儲存 IPC 事件移除函數
+const ipcCleanups: (() => void)[] = [];
 
 // ===================================
 // DOM Elements
@@ -167,9 +181,9 @@ function renderSitesList(): void {
         <span class="site-name">${escapeHtml(site.name)}</span>
         <span class="site-url">${escapeHtml(site.url)}</span>
         <div class="site-actions">
-          <button class="btn-icon" data-action="run-site" title="立即截圖">▶️</button>
-          <button class="btn-icon" data-action="edit-site" title="編輯">✏️</button>
-          <button class="btn-icon" data-action="delete-site" title="刪除">🗑️</button>
+          <button class="btn-text btn-text-success" data-action="run-site" title="立即截圖">執行</button>
+          <button class="btn-text" data-action="edit-site" title="編輯">編輯</button>
+          <button class="btn-text btn-text-danger" data-action="delete-site" title="刪除">刪除</button>
         </div>
       </div>
       ${site.selectors.length > 0 ? `
@@ -206,7 +220,7 @@ function renderModalSelectors(): void {
     <li class="selector-edit-item" data-index="${index}">
       <input type="text" placeholder="Selector 名稱" value="${escapeHtml(sel.name)}" data-field="name">
       <input type="text" placeholder="CSS Selector" value="${escapeHtml(sel.cssSelector)}" data-field="cssSelector">
-      <button class="btn-icon" data-action="delete-selector" title="刪除">🗑️</button>
+      <button class="btn-text btn-text-danger" data-action="delete-selector" title="刪除">刪除</button>
     </li>
   `).join('');
 }
@@ -254,23 +268,23 @@ function setupEventListeners(): void {
     elements.btnAddSite.addEventListener('click', () => openModal());
 
     elements.btnImport.addEventListener('click', async () => {
-        const result = await ipcRenderer.invoke(IPC_CHANNELS.CONFIG_IMPORT);
+        const result = await api.invoke(IPC_CHANNELS.CONFIG_IMPORT) as { success: boolean; config?: AppConfig; message?: string };
         if (result.success && result.config) {
             config = result.config;
             renderSitesList();
             renderSettings();
-            showToast(result.message);
+            showToast(result.message || '匯入成功');
         } else if (result.message !== '已取消') {
-            showToast(result.message, 'error');
+            showToast(result.message || '匯入失敗', 'error');
         }
     });
 
     elements.btnExport.addEventListener('click', async () => {
-        const result = await ipcRenderer.invoke(IPC_CHANNELS.CONFIG_EXPORT);
+        const result = await api.invoke(IPC_CHANNELS.CONFIG_EXPORT) as { success: boolean; message?: string };
         if (result.success) {
-            showToast(result.message);
+            showToast(result.message || '匯出成功');
         } else if (result.message !== '已取消') {
-            showToast(result.message, 'error');
+            showToast(result.message || '匯出失敗', 'error');
         }
     });
 
@@ -284,7 +298,7 @@ function setupEventListeners(): void {
         elements.statusIndicator.className = 'status-indicator status-running';
 
         try {
-            const results: ScreenshotResult[] = await ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_TAKE_ALL);
+            const results = await api.invoke(IPC_CHANNELS.SCREENSHOT_TAKE_ALL) as ScreenshotResult[];
             const successCount = results.filter(r => r.success).length;
             const failCount = results.filter(r => !r.success).length;
 
@@ -293,6 +307,7 @@ function setupEventListeners(): void {
             } else {
                 showToast(`成功 ${successCount} 張，失敗 ${failCount} 張`, 'error');
             }
+            renderResults(results);
         } catch (error) {
             showToast('截圖失敗', 'error');
         } finally {
@@ -310,8 +325,8 @@ function setupEventListeners(): void {
 
     // Output directory selection
     elements.btnSelectDir.addEventListener('click', async () => {
-        const result = await ipcRenderer.invoke(IPC_CHANNELS.SELECT_DIRECTORY);
-        if (result.success) {
+        const result = await api.invoke(IPC_CHANNELS.SELECT_DIRECTORY) as { success: boolean; path?: string };
+        if (result.success && result.path) {
             config.outputDirectory = result.path;
             elements.outputDirectory.value = result.path;
             await saveConfig();
@@ -331,10 +346,10 @@ function setupEventListeners(): void {
         await saveConfig();
 
         if (config.schedule.enabled) {
-            await ipcRenderer.invoke(IPC_CHANNELS.SCHEDULE_START);
+            await api.invoke(IPC_CHANNELS.SCHEDULE_START);
             updateScheduleStatus();
         } else {
-            await ipcRenderer.invoke(IPC_CHANNELS.SCHEDULE_STOP);
+            await api.invoke(IPC_CHANNELS.SCHEDULE_STOP);
             elements.nextRun.textContent = '下次執行: --';
         }
     });
@@ -344,7 +359,7 @@ function setupEventListeners(): void {
         await saveConfig();
 
         if (config.schedule.enabled) {
-            await ipcRenderer.invoke(IPC_CHANNELS.SCHEDULE_START);
+            await api.invoke(IPC_CHANNELS.SCHEDULE_START);
             updateScheduleStatus();
         }
     });
@@ -382,9 +397,15 @@ function setupEventListeners(): void {
                 elements.statusIndicator.className = 'status-indicator status-running';
 
                 try {
-                    const results: ScreenshotResult[] = await ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_TAKE, site);
+                    const results = await api.invoke(IPC_CHANNELS.SCREENSHOT_TAKE, site) as ScreenshotResult[];
                     const successCount = results.filter(r => r.success).length;
-                    showToast(`截取 ${successCount} 張截圖`);
+                    const failCount = results.filter(r => !r.success).length;
+                    if (failCount > 0) {
+                        showToast(`成功 ${successCount} 張，失敗 ${failCount} 張`, 'error');
+                    } else {
+                        showToast(`成功截取 ${successCount} 張截圖`);
+                    }
+                    renderResults(results);
                 } catch (error) {
                     showToast('截圖失敗', 'error');
                 } finally {
@@ -486,26 +507,114 @@ function setupEventListeners(): void {
     });
 
     // Screenshot results from scheduler
-    ipcRenderer.on(IPC_CHANNELS.SCREENSHOT_RESULT, (_event: unknown, results: ScreenshotResult[]) => {
-        const successCount = results.filter(r => r.success).length;
-        showToast(`排程執行完成，截取 ${successCount} 張截圖`);
-        updateScheduleStatus();
-    });
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.SCREENSHOT_RESULT, (...args: unknown[]) => {
+            const results = args[0] as ScreenshotResult[];
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.filter(r => !r.success).length;
+            if (failCount > 0) {
+                showToast(`排程完成：成功 ${successCount} 張，失敗 ${failCount} 張`, 'error');
+            } else {
+                showToast(`排程執行完成，截取 ${successCount} 張截圖`);
+            }
+            renderResults(results);
+            updateScheduleStatus();
+        })
+    );
 
     // Screenshot progress updates
-    ipcRenderer.on(IPC_CHANNELS.SCREENSHOT_PROGRESS, (_event: unknown, tasks: any[]) => {
-        renderTasksStatus(tasks);
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.SCREENSHOT_PROGRESS, (...args: unknown[]) => {
+            const tasks = args[0] as any[];
+            renderTasksStatus(tasks);
 
-        // 更新全域狀態指示器
-        const isAnyRunning = tasks.some(t => t.status === 'running');
-        if (isAnyRunning) {
-            elements.statusIndicator.textContent = '🔄 任務執行中...';
-            elements.statusIndicator.className = 'status-indicator status-running';
-        } else {
-            elements.statusIndicator.textContent = '⏸ 待命中';
-            elements.statusIndicator.className = 'status-indicator status-idle';
-        }
-    });
+            // 更新全域狀態指示器
+            const isAnyRunning = tasks.some(t => t.status === 'running');
+            if (isAnyRunning) {
+                elements.statusIndicator.textContent = '🔄 任務執行中...';
+                elements.statusIndicator.className = 'status-indicator status-running';
+            } else {
+                elements.statusIndicator.textContent = '⏸ 待命中';
+                elements.statusIndicator.className = 'status-indicator status-idle';
+            }
+        })
+    );
+}
+
+// Browser download status elements
+const browserModal = document.getElementById('browser-download-modal') as HTMLDivElement;
+const browserStatusText = document.getElementById('browser-status-text') as HTMLParagraphElement;
+const downloadProgressContainer = document.getElementById('download-progress-container') as HTMLDivElement;
+const downloadProgressBar = document.getElementById('download-progress-bar') as HTMLDivElement;
+const downloadProgressPercent = document.getElementById('download-progress-percent') as HTMLSpanElement;
+const downloadProgressDetails = document.getElementById('download-progress-details') as HTMLSpanElement;
+
+function setupBrowserStatusListeners(): void {
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.BROWSER_STATUS, (...args: unknown[]) => {
+            const status = args[0] as string;
+            if (status === 'checking') {
+                browserModal.classList.remove('hidden');
+                browserStatusText.textContent = '正在檢查瀏覽器組件...';
+                downloadProgressContainer.classList.add('hidden');
+            } else if (status === 'downloading') {
+                browserModal.classList.remove('hidden');
+                browserStatusText.textContent = '正在下載 Chromium 瀏覽器 (約 130MB)...';
+                downloadProgressContainer.classList.remove('hidden');
+            } else if (status === 'ready') {
+                browserStatusText.textContent = '準備完成！';
+                setTimeout(() => {
+                    browserModal.classList.add('hidden');
+                }, 1000);
+            } else if (status === 'error') {
+                browserStatusText.textContent = '瀏覽器下載失敗，請檢查網路連線。';
+                browserStatusText.style.color = '#ff5555';
+                setTimeout(() => {
+                    browserModal.classList.add('hidden');
+                }, 3000);
+            }
+        })
+    );
+
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.BROWSER_DOWNLOAD_PROGRESS, (...args: unknown[]) => {
+            const data = args[0] as { percent: number, downloadedBytes: number, totalBytes: number };
+            downloadProgressBar.style.width = `${data.percent}%`;
+            downloadProgressPercent.textContent = `${data.percent}%`;
+
+            const downloadedMB = (data.downloadedBytes / 1024 / 1024).toFixed(1);
+            const totalMB = (data.totalBytes / 1024 / 1024).toFixed(1);
+            downloadProgressDetails.textContent = `${downloadedMB}MB / ${totalMB}MB`;
+        })
+    );
+}
+
+
+function renderResults(results: ScreenshotResult[]): void {
+    if (results.length === 0) return;
+
+    const html = results.map(r => {
+        const truncatedError = r.error
+            ? escapeHtml(r.error.length > 200 ? r.error.slice(0, 200) + '...' : r.error)
+            : '';
+        const truncatedPath = r.filePath
+            ? escapeHtml(r.filePath.length > 60 ? '...' + r.filePath.slice(-57) : r.filePath)
+            : '';
+
+        return `
+            <div class="result-item ${r.success ? '' : 'failed'}">
+                <div class="result-header">
+                    <span class="result-icon">${r.success ? '✅' : '❌'}</span>
+                    <span class="result-site">${escapeHtml(r.siteName)}</span>
+                    <span class="result-selector">${escapeHtml(r.selectorName)}</span>
+                </div>
+                ${r.success && r.filePath ? `<div class="result-path">${truncatedPath}</div>` : ''}
+                ${!r.success && r.error ? `<div class="result-error">${truncatedError}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    elements.tasksContainer.innerHTML = `<div class="result-list">${html}</div>`;
 }
 
 function renderTasksStatus(tasks: any[]): void {
@@ -543,7 +652,7 @@ function renderTasksStatus(tasks: any[]): void {
 // ===================================
 async function loadConfig(): Promise<void> {
     try {
-        config = await ipcRenderer.invoke(IPC_CHANNELS.CONFIG_LOAD);
+        config = await api.invoke(IPC_CHANNELS.CONFIG_LOAD) as AppConfig;
         renderSitesList();
         renderSettings();
 
@@ -558,7 +667,7 @@ async function loadConfig(): Promise<void> {
 
 async function saveConfig(): Promise<void> {
     try {
-        await ipcRenderer.invoke(IPC_CHANNELS.CONFIG_SAVE, config);
+        await api.invoke(IPC_CHANNELS.CONFIG_SAVE, config);
     } catch (error) {
         console.error('Failed to save config:', error);
         showToast('儲存設定失敗', 'error');
@@ -566,7 +675,7 @@ async function saveConfig(): Promise<void> {
 }
 
 async function updateScheduleStatus(): Promise<void> {
-    const status = await ipcRenderer.invoke(IPC_CHANNELS.SCHEDULE_STATUS);
+    const status = await api.invoke(IPC_CHANNELS.SCHEDULE_STATUS) as { nextInvocation?: string; isRunning?: boolean };
 
     if (status.nextInvocation) {
         const date = new Date(status.nextInvocation);
@@ -586,5 +695,6 @@ async function updateScheduleStatus(): Promise<void> {
 // ===================================
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    setupBrowserStatusListeners();
     loadConfig();
 });
