@@ -1,12 +1,12 @@
 {
   "name": "ad-screenshot-app",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "跨平台廣告版位截圖應用程式",
   "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json --watch",
-    "dev:renderer": "wait-on dist/main/index.js && electron .",
+    "dev:renderer": "wait-on dist/main/main/index.js && electron .",
     "build": "npm run build:main && npm run build:renderer && npm run copy-assets",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "tsc -p tsconfig.renderer.json",
@@ -14,8 +14,14 @@
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist:mac": "electron-builder --mac",
+    "dist:mac:fast": "SKIP_NOTARIZE=true electron-builder --mac -c.directories.output=release-fast",
     "dist:win": "electron-builder --win",
-    "prepare-site": "node scripts/prepare-gh-pages.js"
+    "prepare-site": "node scripts/prepare-gh-pages.js",
+    "clean:data": "rm -rf ~/Library/'Application Support/Ad Screenshot' ~/Library/'Application Support/ad-screenshot-app' ~/Library/Caches/com.adscreenshot.app ~/Library/Logs/'Ad Screenshot' ~/Library/Preferences/com.adscreenshot.app.plist",
+    "uninstall:mac": "rm -rf '/Applications/Ad Screenshot.app' && npm run clean:data && rm -rf ~/Library/'Saved Application State/com.adscreenshot.app.savedState'",
+    "test:e2e": "npm run build && npx playwright test --config=e2e/playwright.config.ts",
+    "test:e2e:headed": "npm run build && npx playwright test --config=e2e/playwright.config.ts --headed",
+    "test:e2e:debug": "npm run build && npx playwright test --config=e2e/playwright.config.ts --debug"
   },
   "keywords": [
     "electron",
@@ -25,17 +31,21 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@puppeteer/browsers": "^2.11.2",
     "ffmpeg-static": "^5.3.0",
     "node-schedule": "^2.1.1",
-    "puppeteer": "^23.0.0",
+    "puppeteer-core": "^24.36.1",
     "puppeteer-screen-recorder": "^3.0.6",
     "uuid": "^11.0.0"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
+    "@playwright/test": "^1.58.1",
     "@types/node": "^22.0.0",
     "@types/node-schedule": "^2.1.8",
     "@types/uuid": "^10.0.0",
     "concurrently": "^9.0.0",
+    "dotenv": "^17.2.3",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "typescript": "^5.0.0",
@@ -59,8 +69,13 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "target": [
         "nsis",

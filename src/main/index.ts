@@ -3,15 +3,24 @@ import * as path from 'path';
 import { ConfigManager } from './config-manager';
 import { ScreenshotEngine } from './screenshot-engine';
 import { Scheduler } from './scheduler';
-import { IPC_CHANNELS, AppConfig, SiteConfig } from '../shared/types';
+import { TaskRunner, TaskContext } from './task-runner';
+import { IPC_CHANNELS, AppConfig, SiteConfig, ScreenshotProgress, ScreenshotResult } from '../shared/types';
+
+const isTestMode = process.env.NODE_ENV === 'test' && process.env.AD_SCREENSHOT_TEST_MODE === '1';
+
+// 測試模式下支援自訂 userData 路徑以隔離測試資料
+if (process.env.ELECTRON_USER_DATA_DIR) {
+    app.setPath('userData', process.env.ELECTRON_USER_DATA_DIR);
+}
 
 let mainWindow: BrowserWindow | null = null;
 let configManager: ConfigManager;
 let screenshotEngine: ScreenshotEngine;
 let scheduler: Scheduler;
+let taskRunner: TaskRunner;
 
 // 儲存進行中的任務狀態
-const activeTasks = new Map<string, any>();
+const activeTasks = new Map<string, ScreenshotProgress>();
 
 function sendProgressUpdate() {
     if (mainWindow) {
@@ -26,8 +35,9 @@ function createWindow(): void {
         minWidth: 900,
         minHeight: 600,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
         },
         titleBarStyle: 'hiddenInset',
         backgroundColor: '#1a1a2e',
@@ -82,112 +92,23 @@ function setupIpcHandlers(): void {
         return { success: false, message: '已取消' };
     });
 
-    // 截圖相關
+    // 截圖相關 - 使用 TaskRunner（測試模式下回傳模擬結果）
     ipcMain.handle(IPC_CHANNELS.SCREENSHOT_TAKE, async (_event, site: SiteConfig) => {
-        // 防止重複執行
-        if (activeTasks.has(site.id)) {
-            console.log(`Task for ${site.name} is already running, skipping.`);
-            return [{
-                success: false,
-                siteName: site.name,
-                selectorName: '系統',
-                error: '任務已在執行中，請稍候',
-                timestamp: new Date().toISOString(),
-            }];
+        if (isTestMode) {
+            return createMockResults(site);
         }
-
         const config = configManager.loadConfig();
-
-        // 設定初始狀態
-        activeTasks.set(site.id, {
-            jobId: site.id,
-            siteName: site.name,
-            url: site.url,
-            status: 'pending',
-            currentSelector: '初始化中...',
-            totalSelectors: 1,
-            completedSelectors: 0
-        });
-        sendProgressUpdate();
-
-        try {
-            const results = await screenshotEngine.takeScreenshots(site.id, {
-                siteId: site.id,
-                url: site.url,
-                siteName: site.name,
-                selectors: site.selectors.filter(s => s.enabled),
-                outputDirectory: config.outputDirectory,
-                fileNamePattern: config.fileNamePattern,
-                fullPageScreenshot: site.fullPageScreenshot || false,
-                recordVideo: site.recordVideo || false,
-            }, (progress: any) => {
-                activeTasks.set(progress.jobId, progress);
-                sendProgressUpdate();
-            });
-            return results;
-        } catch (error) {
-            console.error(`Task ${site.name} failed:`, error);
-            return [{
-                success: false,
-                siteName: site.name,
-                selectorName: '系統',
-                error: error instanceof Error ? error.message : '未知錯誤',
-                timestamp: new Date().toISOString(),
-            }];
-        } finally {
-            // 任務完成後移除
-            activeTasks.delete(site.id);
-            sendProgressUpdate();
-        }
+        return taskRunner.runSingle(site, config);
     });
 
     ipcMain.handle(IPC_CHANNELS.SCREENSHOT_TAKE_ALL, async () => {
         const config = configManager.loadConfig();
-        const results = [];
-
-        for (const site of config.sites.filter(s => s.enabled)) {
-            // 防止重複執行
-            if (activeTasks.has(site.id)) {
-                console.log(`Batch task: ${site.name} is already running, skipping.`);
-                continue;
-            }
-
-            // 設定初始狀態
-            activeTasks.set(site.id, {
-                jobId: site.id,
-                siteName: site.name,
-                url: site.url,
-                status: 'pending',
-                currentSelector: '等待隊列中...',
-                totalSelectors: 1,
-                completedSelectors: 0
-            });
-            sendProgressUpdate();
-
-            try {
-                const siteResults = await screenshotEngine.takeScreenshots(site.id, {
-                    siteId: site.id,
-                    url: site.url,
-                    siteName: site.name,
-                    selectors: site.selectors.filter(s => s.enabled),
-                    outputDirectory: config.outputDirectory,
-                    fileNamePattern: config.fileNamePattern,
-                    fullPageScreenshot: site.fullPageScreenshot || false,
-                    recordVideo: site.recordVideo || false,
-                }, (progress: any) => {
-                    activeTasks.set(progress.jobId, progress);
-                    sendProgressUpdate();
-                });
-                results.push(...siteResults);
-            } catch (error) {
-                console.error(`Batch task ${site.name} failed:`, error);
-            } finally {
-                activeTasks.delete(site.id);
-                sendProgressUpdate();
-            }
+        if (isTestMode) {
+            return config.sites
+                .filter(s => s.enabled)
+                .flatMap(site => createMockResults(site));
         }
-
-        return results;
+        return taskRunner.runAll(config);
     });
 
     // 排程相關
@@ -208,6 +129,9 @@ function setupIpcHandlers(): void {
 
     // 選擇目錄
     ipcMain.handle(IPC_CHANNELS.SELECT_DIRECTORY, async () => {
+        if (isTestMode) {
+            return { success: true, path: '/tmp/test-output' };
+        }
         const result = await dialog.showOpenDialog(mainWindow!, {
             title: '選擇輸出資料夾',
             properties: ['openDirectory', 'createDirectory'],
@@ -220,58 +144,48 @@ function setupIpcHandlers(): void {
     });
 }
 
+function createMockResults(site: SiteConfig): ScreenshotResult[] {
+    const enabledSelectors = site.selectors.filter(s => s.enabled);
+    if (enabledSelectors.length === 0) {
+        return [{
+            success: true,
+            siteName: site.name,
+            selectorName: site.name,
+            filePath: `/mock/path/${site.name}.png`,
+            timestamp: new Date().toISOString(),
+        }];
+    }
+    return enabledSelectors.map(sel => ({
+        success: true,
+        siteName: site.name,
+        selectorName: sel.name,
+        filePath: `/mock/path/${site.name}_${sel.name}.png`,
+        timestamp: new Date().toISOString(),
+    }));
+}
+
 app.whenReady().then(() => {
     // 初始化服務
     configManager = new ConfigManager();
-    screenshotEngine = new ScreenshotEngine();
+
+    if (!isTestMode) {
+        screenshotEngine = new ScreenshotEngine();
+
+        // 建立 TaskRunner 上下文
+        const taskContext: TaskContext = {
+            get mainWindow() { return mainWindow; },
+            screenshotEngine,
+            activeTasks,
+            sendProgressUpdate,
+        };
+        taskRunner = new TaskRunner(taskContext);
+    }
+
+    // 排程回調使用 TaskRunner
     scheduler = new Scheduler(async () => {
-        // 排程執行時的回調
+        if (isTestMode) return;
         const config = configManager.loadConfig();
-        for (const site of config.sites.filter(s => s.enabled)) {
-            // 防止重複執行
-            if (activeTasks.has(site.id)) {
-                console.log(`Scheduled task: ${site.name} is already running, skipping.`);
-                continue;
-            }
-
-            // 設定初始狀態
-            activeTasks.set(site.id, {
-                jobId: site.id,
-                siteName: site.name,
-                url: site.url,
-                status: 'pending',
-                currentSelector: '排程執行中...',
-                totalSelectors: 1,
-                completedSelectors: 0
-            });
-            sendProgressUpdate();
-
-            try {
-                const siteResults = await screenshotEngine.takeScreenshots(site.id, {
-                    siteId: site.id,
-                    url: site.url,
-                    siteName: site.name,
-                    selectors: site.selectors.filter(s => s.enabled),
-                    outputDirectory: config.outputDirectory,
-                    fileNamePattern: config.fileNamePattern,
-                    fullPageScreenshot: site.fullPageScreenshot || false,
-                    recordVideo: site.recordVideo || false,
-                }, (progress: any) => {
-                    activeTasks.set(progress.jobId, progress);
-                    sendProgressUpdate();
-                });
-
-                // 發送結果到渲染程式
-                if (mainWindow) {
-                    mainWindow.webContents.send(IPC_CHANNELS.SCREENSHOT_RESULT, siteResults);
-                }
-            } catch (error) {
-                console.error(`Scheduled task ${site.name} failed:`, error);
-            } finally {
-                activeTasks.delete(site.id);
-                sendProgressUpdate();
-            }
-        }
+        await taskRunner.runScheduled(config);
     });
 
     setupIpcHandlers();
