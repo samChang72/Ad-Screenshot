@@ -54,6 +54,7 @@
   "build": {
     "appId": "com.adscreenshot.app",
     "productName": "Ad Screenshot",
+    "artifactName": "${name}-${version}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
