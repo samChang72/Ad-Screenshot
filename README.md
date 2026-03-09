@@ -11,6 +11,8 @@
 - 匯入 / 匯出設定檔（JSON）
 - 以 iPhone 14 Pro 行動裝置視窗模擬截圖（393×852 @3x）
 - 動態下載 Chromium（首次執行時自動下載，約 130MB）
+- **內建進階反偵測機制**（隱藏 WebDriver 特徵、隨機設備指紋、自動處理 Cloudflare 驗證）
+- **系統日誌面板**（即時追蹤執行狀態、支援層級過濾與文字搜尋）
 
 ## 應用程式截圖
 
@@ -101,6 +103,7 @@ src/
 
 - **Electron** — 桌面應用框架 (Context Isolation 安全模式)
 - **Puppeteer Core + @puppeteer/browsers** — 動態下載 Chromium 截圖引擎
+- **puppeteer-extra-plugin-stealth** — 進階反偵測外掛，規避 Cloudflare 等反爬蟲機制
 - **node-schedule** — 排程任務
 - **TypeScript** — 型別安全開發
 - **puppeteer-screen-recorder** — 操作過程錄影
