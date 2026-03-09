@@ -12,6 +12,7 @@ const VALID_INVOKE_CHANNELS = [
     'schedule:stop',
     'schedule:status',
     'dialog:select-directory',
+    'log:get-all',
 ] as const;
 
 const VALID_ON_CHANNELS = [
@@ -20,6 +21,8 @@ const VALID_ON_CHANNELS = [
     'schedule:status',
     'browser:status',
     'browser:download-progress',
+    'log:entry',
+    'log:clear',
 ] as const;
 
 type ValidInvokeChannel = typeof VALID_INVOKE_CHANNELS[number];

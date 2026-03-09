@@ -69,6 +69,9 @@ const IPC_CHANNELS = {
     SELECT_DIRECTORY: 'dialog:select-directory',
     BROWSER_STATUS: 'browser:status',
     BROWSER_DOWNLOAD_PROGRESS: 'browser:download-progress',
+    LOG_ENTRY: 'log:entry',
+    LOG_GET_ALL: 'log:get-all',
+    LOG_CLEAR: 'log:clear',
 };
 
 // ===================================
@@ -92,6 +95,18 @@ let editingSelectors: SelectorConfig[] = [];
 
 // 儲存 IPC 事件移除函數
 const ipcCleanups: (() => void)[] = [];
+
+interface LogEntry {
+    timestamp: string;
+    level: 'info' | 'warn' | 'error';
+    message: string;
+}
+
+// 日誌狀態
+let logEntries: LogEntry[] = [];
+let logFilterLevel: string = 'all';
+let logSearchText: string = '';
+let logAutoScroll: boolean = true;
 
 // ===================================
 // DOM Elements
@@ -137,6 +152,11 @@ const elements = {
 
     // Toast
     toastContainer: document.getElementById('toast-container') as HTMLDivElement,
+
+    // 日誌面板
+    logContainer: document.getElementById('log-container') as HTMLDivElement,
+    logSearch: document.getElementById('log-search') as HTMLInputElement,
+    btnClearLogs: document.getElementById('btn-clear-logs') as HTMLButtonElement,
 };
 
 // ===================================
@@ -539,6 +559,46 @@ function setupEventListeners(): void {
             }
         })
     );
+
+    // 分頁切換
+    const panelTabs = document.querySelectorAll('.panel-tab');
+    panelTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = (tab as HTMLElement).dataset.tab;
+            panelTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('tab-settings')!.classList.toggle('hidden', tabName !== 'settings');
+            document.getElementById('tab-logs')!.classList.toggle('hidden', tabName !== 'logs');
+        });
+    });
+
+    // 日誌篩選按鈕
+    document.querySelectorAll('.log-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            logFilterLevel = (btn as HTMLElement).dataset.level || 'all';
+            renderAllLogs();
+        });
+    });
+
+    // 日誌搜尋
+    elements.logSearch.addEventListener('input', () => {
+        logSearchText = elements.logSearch.value;
+        renderAllLogs();
+    });
+
+    // 清除日誌按鈕
+    elements.btnClearLogs.addEventListener('click', () => {
+        logEntries = [];
+        renderAllLogs();
+    });
+
+    // 自動捲動偵測
+    elements.logContainer.addEventListener('scroll', () => {
+        const { scrollTop, scrollHeight, clientHeight } = elements.logContainer;
+        logAutoScroll = scrollHeight - scrollTop - clientHeight < 30;
+    });
 }
 
 // Browser download status elements
@@ -589,6 +649,21 @@ function setupBrowserStatusListeners(): void {
     );
 }
 
+function setupLogListeners(): void {
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.LOG_ENTRY, (...args: unknown[]) => {
+            const entry = args[0] as LogEntry;
+            appendLogEntry(entry);
+        })
+    );
+
+    ipcCleanups.push(
+        api.on(IPC_CHANNELS.LOG_CLEAR, () => {
+            logEntries = [];
+            renderAllLogs();
+        })
+    );
+}
 
 function renderResults(results: ScreenshotResult[]): void {
     if (results.length === 0) return;
@@ -648,6 +723,59 @@ function renderTasksStatus(tasks: any[]): void {
 }
 
 // ===================================
+// 日誌函式
+// ===================================
+function formatLogTime(isoString: string): string {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function shouldShowLogEntry(entry: LogEntry): boolean {
+    if (logFilterLevel !== 'all' && entry.level !== logFilterLevel) return false;
+    if (logSearchText && !entry.message.toLowerCase().includes(logSearchText.toLowerCase())) return false;
+    return true;
+}
+
+function createLogEntryHtml(entry: LogEntry): string {
+    return `<div class="log-entry level-${entry.level}">
+        <span class="log-time">${formatLogTime(entry.timestamp)}</span>
+        <span class="log-level log-level-${entry.level}">${entry.level}</span>
+        <span class="log-message">${escapeHtml(entry.message)}</span>
+    </div>`;
+}
+
+function renderAllLogs(): void {
+    const filtered = logEntries.filter(shouldShowLogEntry);
+    if (filtered.length === 0) {
+        elements.logContainer.innerHTML = '<div class="empty-tasks-hint">尚無日誌紀錄</div>';
+        return;
+    }
+    elements.logContainer.innerHTML = filtered.map(createLogEntryHtml).join('');
+    if (logAutoScroll) {
+        elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+    }
+}
+
+function appendLogEntry(entry: LogEntry): void {
+    logEntries = [...logEntries, entry];
+    if (!shouldShowLogEntry(entry)) return;
+
+    // 移除空白提示（如果存在）
+    const hint = elements.logContainer.querySelector('.empty-tasks-hint');
+    if (hint) hint.remove();
+
+    const div = document.createElement('div');
+    div.innerHTML = createLogEntryHtml(entry);
+    const node = div.firstElementChild;
+    if (node) {
+        elements.logContainer.appendChild(node);
+        if (logAutoScroll) {
+            elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+        }
+    }
+}
+
+// ===================================
 // Data Functions
 // ===================================
 async function loadConfig(): Promise<void> {
@@ -693,8 +821,14 @@ async function updateScheduleStatus(): Promise<void> {
 // ===================================
 // Initialize
 // ===================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupBrowserStatusListeners();
+    setupLogListeners();
     loadConfig();
+
+    // 取得既有日誌
+    const existingLogs = await api.invoke(IPC_CHANNELS.LOG_GET_ALL) as LogEntry[];
+    logEntries = existingLogs;
+    renderAllLogs();
 });

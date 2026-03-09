@@ -4,6 +4,7 @@ import { ConfigManager } from './config-manager';
 import { ScreenshotEngine } from './screenshot-engine';
 import { Scheduler } from './scheduler';
 import { TaskRunner, TaskContext } from './task-runner';
+import { initLogInterceptor, getAllLogs, clearLogs } from './log-interceptor';
 import { IPC_CHANNELS, AppConfig, SiteConfig, ScreenshotProgress, ScreenshotResult } from '../shared/types';
 
 const isTestMode = process.env.NODE_ENV === 'test' && process.env.AD_SCREENSHOT_TEST_MODE === '1';
@@ -97,6 +98,7 @@ function setupIpcHandlers(): void {
         if (isTestMode) {
             return createMockResults(site);
         }
+        clearLogs();
         const config = configManager.loadConfig();
         return taskRunner.runSingle(site, config);
     });
@@ -108,6 +110,7 @@ function setupIpcHandlers(): void {
                 .filter(s => s.enabled)
                 .flatMap(site => createMockResults(site));
         }
+        clearLogs();
         return taskRunner.runAll(config);
     });
 
@@ -141,6 +144,11 @@ function setupIpcHandlers(): void {
             return { success: true, path: result.filePaths[0] };
         }
         return { success: false };
+    });
+
+    // Log 相關
+    ipcMain.handle(IPC_CHANNELS.LOG_GET_ALL, async () => {
+        return getAllLogs();
     });
 }
 
@@ -184,12 +192,17 @@ app.whenReady().then(() => {
     // 排程回調使用 TaskRunner
     scheduler = new Scheduler(async () => {
         if (isTestMode) return;
+        clearLogs();
         const config = configManager.loadConfig();
         await taskRunner.runScheduled(config);
     });
 
     setupIpcHandlers();
     createWindow();
+
+    if (mainWindow) {
+        initLogInterceptor(mainWindow);
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

@@ -69,54 +69,80 @@
 
         <!-- 右側：設定詳情 -->
         <section class="panel settings-panel">
-          <section class="config-section collapsible">
-            <div class="section-header collapsible-trigger" id="settings-trigger">
-              <div class="header-left">
-                <h2>⚙️ 輸出設定</h2>
-                <span class="collapse-icon">▼</span>
-              </div>
-            </div>
-            <div class="section-content" id="settings-content">
-              <div class="form-group">
-                <label for="output-directory">輸出目錄</label>
-                <div class="input-with-button">
-                  <input type="text" id="output-directory" placeholder="選擇截圖儲存路徑...">
-                  <button id="btn-select-dir" class="btn btn-secondary">選擇</button>
+          <!-- 分頁列 -->
+          <div class="panel-tabs">
+            <button class="panel-tab active" data-tab="settings">設定</button>
+            <button class="panel-tab" data-tab="logs">系統日誌</button>
+          </div>
+
+          <!-- 設定分頁內容 -->
+          <div class="tab-content" id="tab-settings">
+            <section class="config-section collapsible">
+              <div class="section-header collapsible-trigger" id="settings-trigger">
+                <div class="header-left">
+                  <h2>⚙️ 輸出設定</h2>
+                  <span class="collapse-icon">▼</span>
                 </div>
               </div>
+              <div class="section-content" id="settings-content">
+                <div class="form-group">
+                  <label for="output-directory">輸出目錄</label>
+                  <div class="input-with-button">
+                    <input type="text" id="output-directory" placeholder="選擇截圖儲存路徑...">
+                    <button id="btn-select-dir" class="btn btn-secondary">選擇</button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="filename-pattern">檔案名稱格式</label>
+                  <input type="text" id="filename-pattern" placeholder="{siteName}_{selectorName}_{timestamp}">
+                  <small class="hint">可用變數: {siteName}, {selectorName}, {timestamp}</small>
+                </div>
+              </div>
+            </section>
+
+            <section class="status-section">
+              <div class="section-header">
+                <h2>📊 任務執行狀態</h2>
+              </div>
+              <div id="tasks-container" class="tasks-container">
+                <div class="empty-tasks-hint">目前沒有進行中的任務</div>
+              </div>
+            </section>
+
+            <div class="settings-section">
+              <h3>⏰ 排程設定</h3>
               <div class="form-group">
-                <label for="filename-pattern">檔案名稱格式</label>
-                <input type="text" id="filename-pattern" placeholder="{siteName}_{selectorName}_{timestamp}">
-                <small class="hint">可用變數: {siteName}, {selectorName}, {timestamp}</small>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="schedule-enabled">
+                  <span>啟用自動排程</span>
+                </label>
+              </div>
+              <div class="form-group" id="schedule-options">
+                <label>執行間隔（分鐘）</label>
+                <input type="number" id="schedule-interval" min="1" max="1440" value="60">
+              </div>
+              <div class="schedule-status">
+                <span id="next-run">下次執行: --</span>
               </div>
             </div>
-          </section>
+          </div>
 
-          <!-- 任務執行狀態面板 -->
-          <section class="status-section">
-            <div class="section-header">
-              <h2>📊 任務執行狀態</h2>
+          <!-- 日誌分頁內容 -->
+          <div class="tab-content hidden" id="tab-logs">
+            <div class="log-toolbar">
+              <div class="log-filters">
+                <button class="log-filter-btn active" data-level="all">全部</button>
+                <button class="log-filter-btn" data-level="info">Info</button>
+                <button class="log-filter-btn" data-level="warn">Warn</button>
+                <button class="log-filter-btn" data-level="error">Error</button>
+              </div>
+              <div class="log-actions">
+                <input type="text" id="log-search" class="log-search" placeholder="搜尋...">
+                <button id="btn-clear-logs" class="btn btn-small btn-secondary">清除</button>
+              </div>
             </div>
-            <div id="tasks-container" class="tasks-container">
-              <div class="empty-tasks-hint">目前沒有進行中的任務</div>
-            </div>
-          </section>
-
-          <!-- 排程設定 -->
-          <div class="settings-section">
-            <h3>⏰ 排程設定</h3>
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="schedule-enabled">
-                <span>啟用自動排程</span>
-              </label>
-            </div>
-            <div class="form-group" id="schedule-options">
-              <label>執行間隔（分鐘）</label>
-              <input type="number" id="schedule-interval" min="1" max="1440" value="60">
-            </div>
-            <div class="schedule-status">
-              <span id="next-run">下次執行: --</span>
+            <div id="log-container" class="log-container">
+              <div class="empty-tasks-hint">尚無日誌紀錄</div>
             </div>
           </div>
         </section>

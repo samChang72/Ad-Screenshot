@@ -93,9 +93,22 @@ export const IPC_CHANNELS = {
     // 瀏覽器相關
     BROWSER_DOWNLOAD_PROGRESS: 'browser:download-progress',
     BROWSER_STATUS: 'browser:status',
+
+    // Log 相關
+    LOG_ENTRY: 'log:entry',
+    LOG_GET_ALL: 'log:get-all',
+    LOG_CLEAR: 'log:clear',
 } as const;
 
 export type BrowserStatus = 'checking' | 'downloading' | 'ready' | 'error';
+
+export type LogLevel = 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+    timestamp: string;
+    level: LogLevel;
+    message: string;
+}
 
 
 // 預設設定
