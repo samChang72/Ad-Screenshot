@@ -1,9 +1,16 @@
-import puppeteer, { Browser, Page } from 'puppeteer-core';
+import { Browser, Page } from 'puppeteer-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PuppeteerScreenRecorder } from 'puppeteer-screen-recorder';
 import { ScreenshotJob, ScreenshotResult, SelectorConfig } from '../shared/types';
-import { BrowserManager } from './browser-manager';
+import { launchStealthBrowser } from './stealth-browser';
+import {
+    setupAntiDetection,
+    handleCloudflareChallenge,
+    randomDelay,
+    simulateMouseMovement,
+    getRandomizedScrollParams,
+} from './anti-detection';
 
 export class ScreenshotEngine {
     private browser: Browser | null = null;
@@ -12,7 +19,6 @@ export class ScreenshotEngine {
         // 檢查現有連線是否仍然有效
         if (this.browser) {
             try {
-                // 透過簡單操作測試連線是否存活
                 await this.browser.version();
                 return this.browser;
             } catch {
@@ -21,34 +27,7 @@ export class ScreenshotEngine {
             }
         }
 
-        let executablePath: string | undefined;
-
-        try {
-            // 使用 BrowserManager 取得路徑
-            executablePath = await BrowserManager.getInstance().getExecutablePath();
-
-            // 如果找不到，嘗試確保安裝 (但不帶 UI 回饋)
-            if (!executablePath) {
-                console.log('Browser not found via getExecutablePath, trying ensureBrowser...');
-                executablePath = await BrowserManager.getInstance().ensureBrowser();
-            }
-
-            if (!executablePath) {
-                throw new Error('無法找到或下載 Chromium 瀏覽器');
-            }
-
-            console.log(`Launching browser from: ${executablePath}`);
-
-            this.browser = await puppeteer.launch({
-                headless: true,
-                executablePath,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            });
-        } catch (launchError: any) {
-            const shortMsg = launchError.message?.split('\n')[0] || 'Unknown error';
-            throw new Error(`瀏覽器啟動失敗: ${shortMsg}`);
-        }
-
+        this.browser = await launchStealthBrowser();
         return this.browser;
     }
 
@@ -74,23 +53,31 @@ export class ScreenshotEngine {
                 hasTouch: true,
             });
 
-            // 設定 User Agent 為 iPhone
-            await page.setUserAgent(
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-            );
+            // 反偵測：設定隨機 UA、對應 headers、注入反偵測腳本
+            const selectedUA = await setupAntiDetection(page);
+            console.log(`Using UA: ${selectedUA.substring(0, 60)}...`);
 
             // 載入頁面 (優化：使用 domcontentloaded 以提早啟動，避免被遲到的小腳本阻塞)
             try {
                 await page.goto(job.url, {
                     waitUntil: 'domcontentloaded',
-                    timeout: 45000 // 縮短一點導航超時，把時間留給滾動載入
+                    timeout: 45000
                 });
             } catch (error) {
                 console.warn(`Navigation timeout or error for ${job.url}, attempting to proceed anyway...`);
             }
 
-            // 等待頁面主體渲染（給予基本渲染時間）
-            await this.delay(3000);
+            // 嘗試處理 Cloudflare challenge
+            const cfResolved = await handleCloudflareChallenge(page);
+            if (cfResolved) {
+                console.log(`Cloudflare challenge resolved for ${job.url}`);
+            }
+
+            // 模擬真實使用者的滑鼠移動
+            await simulateMouseMovement(page);
+
+            // 等待頁面主體渲染（隨機化延遲）
+            await randomDelay(2500, 4000);
 
             // 確保輸出目錄存在
             if (!fs.existsSync(job.outputDirectory)) {
@@ -294,8 +281,8 @@ export class ScreenshotEngine {
             // 等待圖片載入
             await this.waitForImages(page);
 
-            // 額外等待確保內容完全載入
-            await this.delay(1500);
+            // 額外等待確保內容完全載入（隨機化）
+            await randomDelay(1200, 1800);
 
             const filePath = path.join(job.outputDirectory, `${fileName}.png`);
 
@@ -333,11 +320,12 @@ export class ScreenshotEngine {
         }
     }
 
-    // 滾動整個頁面觸發懶加載
+    // 滾動整個頁面觸發懶加載（隨機化滾動行為）
     private async scrollFullPage(page: Page): Promise<void> {
-        await page.evaluate(async () => {
-            const scrollStep = window.innerHeight / 2;
-            const scrollDelay = 1000;
+        const { scrollStepFactor, scrollDelayMs } = getRandomizedScrollParams();
+        await page.evaluate(async (stepFactor: number, delayMs: number) => {
+            const scrollStep = Math.floor(window.innerHeight / 2 * stepFactor);
+            const scrollDelay = delayMs;
 
             // 取得頁面總高度
             const getScrollHeight = () => Math.max(
@@ -345,12 +333,15 @@ export class ScreenshotEngine {
                 document.documentElement.scrollHeight
             );
 
+            const MAX_SCROLL_ITERATIONS = 50;
             let currentPosition = 0;
             let previousHeight = 0;
             let scrollHeight = getScrollHeight();
+            let iterations = 0;
 
             // 滾動到底部
-            while (currentPosition < scrollHeight) {
+            while (currentPosition < scrollHeight && iterations < MAX_SCROLL_ITERATIONS) {
+                iterations++;
                 window.scrollTo(0, currentPosition);
                 await new Promise(resolve => setTimeout(resolve, scrollDelay));
                 currentPosition += scrollStep;
@@ -375,7 +366,7 @@ export class ScreenshotEngine {
             // 滾回頂部
             window.scrollTo(0, 0);
             await new Promise(resolve => setTimeout(resolve, 300));
-        });
+        }, scrollStepFactor, scrollDelayMs);
     }
 
     // 等待所有圖片載入
@@ -417,10 +408,6 @@ export class ScreenshotEngine {
             .replace(/[:.]/g, '-')
             .replace('T', '_')
             .slice(0, 19);
-    }
-
-    private delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async close(): Promise<void> {

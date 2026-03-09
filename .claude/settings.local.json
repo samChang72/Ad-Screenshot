@@ -13,7 +13,27 @@
       "Bash(npx playwright test:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\ntest: 新增 Playwright E2E 測試框架\n\n- 使用 Playwright Electron 支援建立 22 個 E2E 測試案例\n- 涵蓋應用啟動、網站 CRUD、Selector CRUD、截圖觸發、排程設定、設定匯出匯入\n- 在 main process 加入測試模式（NODE_ENV=test + AD_SCREENSHOT_TEST_MODE）mock 截圖引擎\n- 每個測試使用獨立 userData 目錄確保隔離\n- 更新 README 加入測試說明，更新 .gitignore 排除 .env 和測試產出\nEOF\n\\)\")",
-      "Bash(gh release:*)"
+      "Bash(gh release:*)",
+      "Bash(xcrun notarytool store-credentials:*)",
+      "Bash(timeout 30 xcrun notarytool history:*)",
+      "Bash(xcrun notarytool history --apple-id \"oneadios@onead.com.tw\" --password \"plrh-dtuz-yodf-azax\" --team-id \"LA6A8U82F5\" --verbose)",
+      "Bash(xcrun notarytool info:*)",
+      "Bash(xcrun notarytool log \"e7777149-1774-45c4-b84f-8f01395d8795\" --apple-id \"oneadios@onead.com.tw\" --password \"plrh-dtuz-yodf-azax\" --team-id \"LA6A8U82F5\")",
+      "Bash(codesign:*)",
+      "Bash(find:*)",
+      "Bash(npm run dist:*)",
+      "Bash(source .env:*)",
+      "Bash(bash:*)",
+      "Bash(xcrun stapler:*)",
+      "Bash(ditto:*)",
+      "Bash(hdiutil create:*)",
+      "Bash(spctl:*)",
+      "Bash(grep Developer ID:*)",
+      "Bash(curl:*)",
+      "Bash(npm run:*)",
+      "Bash(python3:*)",
+      "Bash(git:*)",
+      "mcp__plugin_context-mode_context-mode__execute_file"
     ]
   }
 }
