@@ -1,23 +1,23 @@
-# Log Panel Implementation Plan
+# 系統日誌面板實作計畫
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add a "System Log" tab to the right-side settings panel, displaying all main process stdout/stderr output in real-time with level filtering, search, and auto-clear on task start.
+**目標：** 在右側設定面板新增「系統日誌」分頁，即時顯示主程序所有 stdout/stderr 輸出，支援等級篩選、搜尋功能，並在任務啟動時自動清除。
 
-**Architecture:** Monkey-patch `process.stdout.write` / `process.stderr.write` in main process to intercept all output. Push log entries via IPC to renderer. Renderer displays in a new tab on the right panel with filtering/search toolbar.
+**架構：** 在主程序中 monkey-patch `process.stdout.write` / `process.stderr.write` 攔截所有輸出。透過 IPC 將日誌條目推送至 renderer。Renderer 在右側面板新增分頁，搭配篩選/搜尋工具列顯示日誌。
 
-**Tech Stack:** Electron IPC, TypeScript, vanilla DOM manipulation
+**技術棧：** Electron IPC、TypeScript、原生 DOM 操作
 
 ---
 
-### Task 1: Add LogEntry type and IPC channel constants
+### 任務 1：新增 LogEntry 型別與 IPC 通道常數
 
-**Files:**
-- Modify: `src/shared/types.ts`
+**檔案：**
+- 修改：`src/shared/types.ts`
 
-**Step 1: Add LogEntry interface and new IPC channels**
+**步驟 1：新增 LogEntry 介面與 IPC 通道**
 
-Add after `BrowserStatus` type (line 98):
+在 `BrowserStatus` 型別之後新增（第 98 行）：
 
 ```typescript
 export type LogLevel = 'info' | 'warn' | 'error';
@@ -29,7 +29,7 @@ export interface LogEntry {
 }
 ```
 
-Add to `IPC_CHANNELS` object (after `BROWSER_STATUS` line 95):
+在 `IPC_CHANNELS` 物件中新增（`BROWSER_STATUS` 第 95 行之後）：
 
 ```typescript
     // Log 相關
@@ -38,7 +38,7 @@ Add to `IPC_CHANNELS` object (after `BROWSER_STATUS` line 95):
     LOG_CLEAR: 'log:clear',
 ```
 
-**Step 2: Commit**
+**步驟 2：提交**
 
 ```bash
 git add src/shared/types.ts
@@ -47,12 +47,12 @@ git commit -m "feat: 新增 LogEntry 型別與 log IPC 通道常數"
 
 ---
 
-### Task 2: Create log-interceptor.ts
+### 任務 2：建立 log-interceptor.ts
 
-**Files:**
-- Create: `src/main/log-interceptor.ts`
+**檔案：**
+- 新建：`src/main/log-interceptor.ts`
 
-**Step 1: Create the log interceptor module**
+**步驟 1：建立日誌攔截器模組**
 
 ```typescript
 import { BrowserWindow } from 'electron';
@@ -116,7 +116,7 @@ export function clearLogs(): void {
 }
 ```
 
-**Step 2: Commit**
+**步驟 2：提交**
 
 ```bash
 git add src/main/log-interceptor.ts
@@ -125,20 +125,20 @@ git commit -m "feat: 建立 stdout/stderr 攔截器模組"
 
 ---
 
-### Task 3: Wire log interceptor into main process
+### 任務 3：將日誌攔截器整合至主程序
 
-**Files:**
-- Modify: `src/main/index.ts`
+**檔案：**
+- 修改：`src/main/index.ts`
 
-**Step 1: Add imports (line 6, after TaskRunner import)**
+**步驟 1：新增 import（第 6 行，TaskRunner import 之後）**
 
 ```typescript
 import { initLogInterceptor, getAllLogs, clearLogs } from './log-interceptor';
 ```
 
-**Step 2: Call initLogInterceptor after createWindow (inside `app.whenReady().then`)**
+**步驟 2：在 createWindow 之後呼叫 initLogInterceptor（在 `app.whenReady().then` 內）**
 
-After `createWindow();` (line 192), add:
+在 `createWindow();`（第 192 行）之後新增：
 
 ```typescript
     if (mainWindow) {
@@ -146,9 +146,9 @@ After `createWindow();` (line 192), add:
     }
 ```
 
-**Step 3: Add IPC handlers in `setupIpcHandlers()`**
+**步驟 3：在 `setupIpcHandlers()` 中新增 IPC 處理器**
 
-After the `SELECT_DIRECTORY` handler block (after line 144), add:
+在 `SELECT_DIRECTORY` 處理器區塊之後（第 144 行之後）新增：
 
 ```typescript
     // Log 相關
@@ -157,9 +157,9 @@ After the `SELECT_DIRECTORY` handler block (after line 144), add:
     });
 ```
 
-**Step 4: Add clearLogs() calls at task start**
+**步驟 4：在任務啟動時新增 clearLogs() 呼叫**
 
-In the `SCREENSHOT_TAKE` handler (line 96), add `clearLogs();` before calling `taskRunner.runSingle`:
+在 `SCREENSHOT_TAKE` 處理器（第 96 行），於呼叫 `taskRunner.runSingle` 之前新增 `clearLogs();`：
 
 ```typescript
     ipcMain.handle(IPC_CHANNELS.SCREENSHOT_TAKE, async (_event, site: SiteConfig) => {
@@ -172,7 +172,7 @@ In the `SCREENSHOT_TAKE` handler (line 96), add `clearLogs();` before calling `t
     });
 ```
 
-In the `SCREENSHOT_TAKE_ALL` handler (line 104), add `clearLogs();` before the non-test path:
+在 `SCREENSHOT_TAKE_ALL` 處理器（第 104 行），於非測試路徑之前新增 `clearLogs();`：
 
 ```typescript
     ipcMain.handle(IPC_CHANNELS.SCREENSHOT_TAKE_ALL, async () => {
@@ -187,9 +187,9 @@ In the `SCREENSHOT_TAKE_ALL` handler (line 104), add `clearLogs();` before the n
     });
 ```
 
-**Step 5: Add clearLogs() in scheduler callback**
+**步驟 5：在排程回呼中新增 clearLogs()**
 
-In the scheduler callback (line 185-189), add `clearLogs();` before `taskRunner.runScheduled`:
+在排程回呼（第 185-189 行），於 `taskRunner.runScheduled` 之前新增 `clearLogs();`：
 
 ```typescript
     scheduler = new Scheduler(async () => {
@@ -200,7 +200,7 @@ In the scheduler callback (line 185-189), add `clearLogs();` before `taskRunner.
     });
 ```
 
-**Step 6: Commit**
+**步驟 6：提交**
 
 ```bash
 git add src/main/index.ts
@@ -209,25 +209,25 @@ git commit -m "feat: 整合 log 攔截器至主程式與任務觸發清空"
 
 ---
 
-### Task 4: Add log IPC channels to preload whitelist
+### 任務 4：將 log IPC 通道加入 preload 白名單
 
-**Files:**
-- Modify: `src/main/preload.ts`
+**檔案：**
+- 修改：`src/main/preload.ts`
 
-**Step 1: Add `log:get-all` to VALID_INVOKE_CHANNELS (line 14)**
+**步驟 1：將 `log:get-all` 加入 VALID_INVOKE_CHANNELS（第 14 行）**
 
 ```typescript
     'log:get-all',
 ```
 
-**Step 2: Add `log:entry` and `log:clear` to VALID_ON_CHANNELS (line 22-23)**
+**步驟 2：將 `log:entry` 和 `log:clear` 加入 VALID_ON_CHANNELS（第 22-23 行）**
 
 ```typescript
     'log:entry',
     'log:clear',
 ```
 
-**Step 3: Commit**
+**步驟 3：提交**
 
 ```bash
 git add src/main/preload.ts
@@ -236,24 +236,24 @@ git commit -m "feat: 新增 log 通道至 preload 白名單"
 
 ---
 
-### Task 5: Add tab bar and log panel HTML
+### 任務 5：新增分頁列與日誌面板 HTML
 
-**Files:**
-- Modify: `src/renderer/index.html`
+**檔案：**
+- 修改：`src/renderer/index.html`
 
-**Step 1: Replace settings-panel section (lines 71-122)**
+**步驟 1：替換 settings-panel 區段（第 71-122 行）**
 
-Replace the `<section class="panel settings-panel">` block with:
+將 `<section class="panel settings-panel">` 區塊替換為：
 
 ```html
         <section class="panel settings-panel">
-          <!-- Tab Bar -->
+          <!-- 分頁列 -->
           <div class="panel-tabs">
             <button class="panel-tab active" data-tab="settings">設定</button>
             <button class="panel-tab" data-tab="logs">系統日誌</button>
           </div>
 
-          <!-- Settings Tab Content -->
+          <!-- 設定分頁內容 -->
           <div class="tab-content" id="tab-settings">
             <section class="config-section collapsible">
               <div class="section-header collapsible-trigger" id="settings-trigger">
@@ -305,7 +305,7 @@ Replace the `<section class="panel settings-panel">` block with:
             </div>
           </div>
 
-          <!-- Log Tab Content -->
+          <!-- 日誌分頁內容 -->
           <div class="tab-content hidden" id="tab-logs">
             <div class="log-toolbar">
               <div class="log-filters">
@@ -326,7 +326,7 @@ Replace the `<section class="panel settings-panel">` block with:
         </section>
 ```
 
-**Step 2: Commit**
+**步驟 2：提交**
 
 ```bash
 git add src/renderer/index.html
@@ -335,16 +335,16 @@ git commit -m "feat: 新增 tab bar 與系統日誌面板 HTML 結構"
 
 ---
 
-### Task 6: Add CSS for tab bar and log panel
+### 任務 6：新增分頁列與日誌面板 CSS
 
-**Files:**
-- Modify: `src/renderer/styles/main.css`
+**檔案：**
+- 修改：`src/renderer/styles/main.css`
 
-**Step 1: Add styles before the Scrollbar section (before line 1019)**
+**步驟 1：在 Scrollbar 區段之前新增樣式（第 1019 行之前）**
 
 ```css
 /* ===================================
-   Panel Tabs
+   面板分頁
    =================================== */
 .panel-tabs {
   display: flex;
@@ -383,7 +383,7 @@ git commit -m "feat: 新增 tab bar 與系統日誌面板 HTML 結構"
 }
 
 /* ===================================
-   Log Panel
+   日誌面板
    =================================== */
 .log-toolbar {
   display: flex;
@@ -515,7 +515,7 @@ git commit -m "feat: 新增 tab bar 與系統日誌面板 HTML 結構"
 }
 ```
 
-**Step 2: Commit**
+**步驟 2：提交**
 
 ```bash
 git add src/renderer/styles/main.css
@@ -524,12 +524,12 @@ git commit -m "feat: 新增 tab bar 與系統日誌面板樣式"
 
 ---
 
-### Task 7: Add log panel logic to renderer
+### 任務 7：在 renderer 新增日誌面板邏輯
 
-**Files:**
-- Modify: `src/renderer/app.ts`
+**檔案：**
+- 修改：`src/renderer/app.ts`
 
-**Step 1: Add log IPC channels to the IPC_CHANNELS object (after line 71)**
+**步驟 1：在 IPC_CHANNELS 物件中新增 log 通道（第 71 行之後）**
 
 ```typescript
     LOG_ENTRY: 'log:entry',
@@ -537,7 +537,7 @@ git commit -m "feat: 新增 tab bar 與系統日誌面板樣式"
     LOG_CLEAR: 'log:clear',
 ```
 
-**Step 2: Add LogEntry interface and log state (after line 94, the ipcCleanups line)**
+**步驟 2：新增 LogEntry 介面與日誌狀態（第 94 行 ipcCleanups 之後）**
 
 ```typescript
 interface LogEntry {
@@ -546,27 +546,27 @@ interface LogEntry {
     message: string;
 }
 
-// Log state
+// 日誌狀態
 let logEntries: LogEntry[] = [];
 let logFilterLevel: string = 'all';
 let logSearchText: string = '';
 let logAutoScroll: boolean = true;
 ```
 
-**Step 3: Add log DOM elements to the `elements` object (after toastContainer, line 139)**
+**步驟 3：在 `elements` 物件中新增日誌 DOM 元素（toastContainer 之後，第 139 行）**
 
 ```typescript
-    // Log Panel
+    // 日誌面板
     logContainer: document.getElementById('log-container') as HTMLDivElement,
     logSearch: document.getElementById('log-search') as HTMLInputElement,
     btnClearLogs: document.getElementById('btn-clear-logs') as HTMLButtonElement,
 ```
 
-**Step 4: Add log rendering functions (after `renderTasksStatus` function, before Data Functions section ~line 649)**
+**步驟 4：新增日誌渲染函式（在 `renderTasksStatus` 函式之後、Data Functions 區段之前，約第 649 行）**
 
 ```typescript
 // ===================================
-// Log Functions
+// 日誌函式
 // ===================================
 function formatLogTime(isoString: string): string {
     const d = new Date(isoString);
@@ -603,7 +603,7 @@ function appendLogEntry(entry: LogEntry): void {
     logEntries = [...logEntries, entry];
     if (!shouldShowLogEntry(entry)) return;
 
-    // Remove empty hint if present
+    // 移除空白提示（如果存在）
     const hint = elements.logContainer.querySelector('.empty-tasks-hint');
     if (hint) hint.remove();
 
@@ -619,10 +619,10 @@ function appendLogEntry(entry: LogEntry): void {
 }
 ```
 
-**Step 5: Add tab switching and log event listeners in `setupEventListeners()` (before the closing `}` of setupEventListeners)**
+**步驟 5：在 `setupEventListeners()` 中新增分頁切換與日誌事件監聽器（在 setupEventListeners 的結尾 `}` 之前）**
 
 ```typescript
-    // Tab switching
+    // 分頁切換
     const panelTabs = document.querySelectorAll('.panel-tab');
     panelTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -634,7 +634,7 @@ function appendLogEntry(entry: LogEntry): void {
         });
     });
 
-    // Log filter buttons
+    // 日誌篩選按鈕
     document.querySelectorAll('.log-filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
@@ -644,28 +644,28 @@ function appendLogEntry(entry: LogEntry): void {
         });
     });
 
-    // Log search
+    // 日誌搜尋
     elements.logSearch.addEventListener('input', () => {
         logSearchText = elements.logSearch.value;
         renderAllLogs();
     });
 
-    // Clear logs button
+    // 清除日誌按鈕
     elements.btnClearLogs.addEventListener('click', () => {
         logEntries = [];
         renderAllLogs();
     });
 
-    // Auto-scroll detection
+    // 自動捲動偵測
     elements.logContainer.addEventListener('scroll', () => {
         const { scrollTop, scrollHeight, clientHeight } = elements.logContainer;
         logAutoScroll = scrollHeight - scrollTop - clientHeight < 30;
     });
 ```
 
-**Step 6: Add log IPC listeners in `setupBrowserStatusListeners()` or after it**
+**步驟 6：在 `setupBrowserStatusListeners()` 之後新增日誌 IPC 監聽器**
 
-After `setupBrowserStatusListeners` function, add a new function:
+在 `setupBrowserStatusListeners` 函式之後，新增以下函式：
 
 ```typescript
 function setupLogListeners(): void {
@@ -685,9 +685,9 @@ function setupLogListeners(): void {
 }
 ```
 
-**Step 7: Call setupLogListeners and fetch existing logs in the DOMContentLoaded handler (line 696-700)**
+**步驟 7：在 DOMContentLoaded 處理器中呼叫 setupLogListeners 並取得既有日誌（第 696-700 行）**
 
-Update the init block:
+更新初始化區塊：
 
 ```typescript
 document.addEventListener('DOMContentLoaded', async () => {
@@ -696,14 +696,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupLogListeners();
     loadConfig();
 
-    // Fetch existing logs
+    // 取得既有日誌
     const existingLogs = await api.invoke(IPC_CHANNELS.LOG_GET_ALL) as LogEntry[];
     logEntries = existingLogs;
     renderAllLogs();
 });
 ```
 
-**Step 8: Commit**
+**步驟 8：提交**
 
 ```bash
 git add src/renderer/app.ts
@@ -712,31 +712,31 @@ git commit -m "feat: 實作系統日誌面板 UI 邏輯與 IPC 監聽"
 
 ---
 
-### Task 8: Build and verify
+### 任務 8：建置與驗證
 
-**Step 1: Build the project**
+**步驟 1：建置專案**
 
 ```bash
 cd /Users/sam/project/Ad-Screenshot && npm run build
 ```
 
-Expected: no TypeScript errors.
+預期結果：無 TypeScript 錯誤。
 
-**Step 2: Run dev mode and verify**
+**步驟 2：以開發模式執行並驗證**
 
 ```bash
 npm run dev
 ```
 
-Verify:
-- Right panel shows two tabs: "設定" and "系統日誌"
-- Clicking "系統日誌" shows log panel with filter buttons and search
-- Logs appear in real-time (e.g. Chrome download, UA messages)
-- Clicking "立即執行" clears previous logs and shows new ones
-- Filter buttons and search work
-- Auto-scroll works, pauses on manual scroll-up
+驗證項目：
+- 右側面板顯示兩個分頁：「設定」與「系統日誌」
+- 點擊「系統日誌」顯示日誌面板，含篩選按鈕與搜尋
+- 日誌即時顯示（如 Chrome 下載、UA 訊息等）
+- 點擊「立即執行」清除先前日誌並顯示新日誌
+- 篩選按鈕與搜尋功能正常運作
+- 自動捲動正常，手動向上捲動時暫停自動捲動
 
-**Step 3: Final commit**
+**步驟 3：最終提交**
 
 ```bash
 git add -A

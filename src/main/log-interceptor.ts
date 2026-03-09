@@ -1,8 +1,10 @@
 import { BrowserWindow } from 'electron';
 import { IPC_CHANNELS, LogEntry, LogLevel } from '../shared/types';
 
-const logs: LogEntry[] = [];
+const MAX_LOGS = 5000;
+let logs: LogEntry[] = [];
 let targetWindow: BrowserWindow | null = null;
+let isInitialized = false;
 
 function detectLevel(message: string, isStderr: boolean): LogLevel {
     if (isStderr) return 'error';
@@ -21,7 +23,11 @@ function addEntry(message: string, isStderr: boolean): void {
         level: detectLevel(trimmed, isStderr),
         message: trimmed,
     };
-    logs.push(entry);
+    
+    logs = [...logs, entry];
+    if (logs.length > MAX_LOGS) {
+        logs = logs.slice(logs.length - MAX_LOGS);
+    }
 
     if (targetWindow && !targetWindow.isDestroyed()) {
         targetWindow.webContents.send(IPC_CHANNELS.LOG_ENTRY, entry);
@@ -29,6 +35,9 @@ function addEntry(message: string, isStderr: boolean): void {
 }
 
 export function initLogInterceptor(win: BrowserWindow): void {
+    if (isInitialized) return;
+    isInitialized = true;
+
     targetWindow = win;
 
     const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -52,7 +61,7 @@ export function getAllLogs(): LogEntry[] {
 }
 
 export function clearLogs(): void {
-    logs.length = 0;
+    logs = [];
     if (targetWindow && !targetWindow.isDestroyed()) {
         targetWindow.webContents.send(IPC_CHANNELS.LOG_CLEAR);
     }
